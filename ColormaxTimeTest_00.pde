@@ -27,12 +27,16 @@ import java.util.*;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import javax.swing.Timer;
+import java.text.DecimalFormat;
+import java.math.RoundingMode;
+import java.math.*;
 
 // Intervals for taking data in seconds
 // This, ideally would be edited via some fort of GUI,
 // But this program should aslo be ~1 time use, so I'm not worried about it
 // Putting it at the top of the application code will have to do
 final int[] colormaxIntervals = {
+0,
 60,                // 1 minute
 120,               // 2 minutes
 180,               // 3 minutes
@@ -146,6 +150,14 @@ void resetIntArray(int[] inputArray){
     inputArray[i] = 0;
   }
 }
+
+// Reset Int Array **************************************************
+void resetFloatArray(float[] inputArray){
+  for (int i = 0; i < inputArray.length; i++ ) {
+    inputArray[i] = 0.0;
+  }
+}
+
 
 // colormaxPorts Reset **************************************************
 void colormaxPortsReset() {
@@ -276,7 +288,6 @@ void updateColormaxInfo(Colormax inColormax) {
    lblGreenHexData.setText(String.valueOf(inColormax.getGreen()) + "H");
    lblBlueHexData.setText(String.valueOf(inColormax.getBlue()) + "H");
    lblTemperatureData.setText(String.format("%.2f", inColormax.getTemperature() - 0.005));
-   ////lblLEDCurrentData.setText(inColormax.getLedMa());
    lblLEDCurrentData.setText(String.format("%.2f", inColormax.getLedMaFloat() - 0.005));
    lblDACSettingData.setText(inColormax.getLedDac());
    lblLedStabilityData.setText(inColormax.getLedStability());
@@ -315,54 +326,90 @@ volatile int blueChannel[] = new int[sampleSize];     // For storing blue channe
 // 0 = red channel readings
 // 1 = green channel readings
 // 2 = blue channel readings
-volatile int averagedReadings[] = new int[3];
+volatile float averagedReadings[] = new float[3];
 
 volatile int avgReadingsIndex;  // For keeping track of how many readings we have in the averaging arrays (we could technically do this by checking for zeroes or nulls or something, but w/e)
+volatile boolean gettingAvg = false;
 
 void getAveragedReadings(Colormax inColormax){
   // Make sure we start clean with our arrays; set all their values to 0
   resetIntArray(redChannel);
   resetIntArray(greenChannel);
   resetIntArray(blueChannel);
-  resetIntArray(averagedReadings);
+  resetFloatArray(averagedReadings);
   
   avgReadingsIndex = 0;    // Reset the index variable
+  gettingAvg = true;       // Let serialEvent know we're getting an avg of readings
   
   final int commandDelay = 50;              // Delay in milliseconds required between serial commands (range: 25-infinity)
-  for(int i = 0 ; i < sampleSize ; i++){    // Send the !d command enough times to fill the arrays
+  for(int i = 0 ; i < redChannel.length ; i++){    // Send the !d command enough times to fill the arrays
     inColormax.readData();                  // Ask colormax for RGB readings
     delay(commandDelay);                    // Required delay; Colormax needs time to respond and recoup
   }
+  
+  int startMillis = millis();               //  Setup for timeout
+  while(avgReadingsIndex != -1){            // Check if we're done getting avgReadings
+    delay(1);                               // Gotta put a delay in; not sure why
+    if(millis() - startMillis > 5000){      // Check for timeout
+      println("@@@@@@@@@@ avgReadings timeout @@@@@@@@@@");    // Error message
+      break;
+    }
+  }
+  
+  int redAvg = 0;
+  int greenAvg = 0;
+  int blueAvg = 0;
+  for(int i = 0 ; i < redChannel.length ; i++){
+     redAvg += redChannel[i];
+  }
+  for(int i = 0 ; i < greenChannel.length ; i++){
+     greenAvg += greenChannel[i];
+  }
+  for(int i = 0 ; i < blueChannel.length ; i++){
+     blueAvg += blueChannel[i];
+  }
+  redAvg /= redChannel.length;
+  greenAvg /= greenChannel.length;
+  blueAvg /= blueChannel.length;
+  
+  DecimalFormat df = new DecimalFormat("###.00");
+  
+  averagedReadings[0] = Float.valueOf(df.format((float)redAvg / 0xffc0 * 100));
+  averagedReadings[1] = Float.valueOf(df.format((float)greenAvg / 0xffc0 * 100));
+  averagedReadings[2] = Float.valueOf(df.format((float)blueAvg / 0xffc0 * 100));
+  //println(averagedReadings);
+  //averagedReadings[0] = (float)redAvg / 0xffc0 * 100;
+  //averagedReadings[1] = (float)greenAvg / 0xffc0 * 100;
+  //averagedReadings[2] = (float)blueAvg / 0xffc0 * 100;
 }
 
 // Timer Listeners **************************************************
 volatile int counter = 0;
 ActionListener oneSecondTimerListener = new ActionListener() {
   public void actionPerformed(ActionEvent e) {
-    println("yeet");
+    //println("yeet");
     final int max = 60;
-    int colorIndex = 0;
     counter++;
 
     // quick fix to make this code work from where it used to be
     Colormax inColormax = colormaxes[listColormaxSelect.getSelectedIndex()];
-
-    //// Get which color is selected
-    //for (colorIndex = 0; colorIndex < colorOptions.length; colorIndex++) {
-    //  if (colorOptions[colorIndex].isSelected()) {
-    //    break;
-    //  }
-    //}
     
-    // Check for negative values real fast
-    if (counter < 0) {
-      println("@@@@@ timer counter error; non-positive value @@@@@");
+    if (counter < 0) {   // Check for negative values real fast
+      println("@@@@@@@@@@ timer counter error; non-positive value @@@@@@@@@@");
     }
+    
     else if(inColormax.getStatus() == inColormax.timeTesting){
-      if(counter >= colormaxIntervals[timeTestIndex]){
-        timeTestIndex++;
+      if(counter >= colormaxIntervals[timeTestIndex]){    // Check if we've passed our next intervals (see colormaxIntervals[])
+        timeTestIndex++;                                  // If we have, up the index
+        getAveragedReadings(inColormax);                  // Get averaged readings
+        println(averagedReadings);
+        // TO DO:
+        // Print out to writers
+          // one volatile, global one,
+          // one that we make and close here
       }
     }
+    
     else if (inColormax.getStatus() == inColormax.calibrating && counter >= max) {
       counter = 0;            // Reset counter
       oneSecondTimer.stop();  // End timer
@@ -376,25 +423,6 @@ ActionListener oneSecondTimerListener = new ActionListener() {
         delay(100);                     // 100ms delay to make sure colormax gets the command
         inColormax.writeAlignColor();   // Tell colormax to take readings
         inColormax.setStatus(inColormax.idle);  // Reset Colormax status
-        //btnCalibrateColor.setLocalColorScheme(GCScheme.CYAN_SCHEME); // Set button back to the default color scheme
-
-        // Check if user wants to hear a beep
-        //if (chkBeepOnRead.isSelected()) {
-        //  Toolkit.getDefaultToolkit().beep();
-        //}
-
-        //// Move the radio selection for the user
-        //for (int i = 0; i < colorOptions.length; i++) {
-        //  if (colorOptions[i].isSelected()) {
-        //    try {
-        //      colorOptions[++i].setSelected(true);
-        //    }
-        //    catch(ArrayIndexOutOfBoundsException ex) {
-        //      colorOptions[0].setSelected(true);
-        //    }
-        //    break;
-        //  }
-        //}
       }
     }
   }
@@ -423,198 +451,6 @@ ActionListener updateTimerListener = new ActionListener() {
     }
   }
 };
-
-// Cancel Align/Retake timers **************************************************
-void cancelAlignRetake(Colormax inColormax) {
-  // Set UI elements back to normal
-  //btnRetakePoint.setLocalColorScheme(GCScheme.CYAN_SCHEME);     // Set button back to the default color scheme
-  //btnCalibrateColor.setLocalColorScheme(GCScheme.CYAN_SCHEME);  // Set button back to the default color scheme
-
-  inColormax.setStatus(inColormax.idle);  // Reset Colormax status
-
-  oneSecondTimer.stop();    // Stop the timer
-  counter = 0;              // Reset counter
-  //retakeReadTT.cancel();  // 
-  //alignColorTT.cancel();  //
-}
-
-//boolean continuePopup(String message) {
-
-
-//  return false;
-//}
-
-
-
-// Get Align Table **************************************************
-volatile int point;
-volatile Colormax currentColormax;
-void getAlignTable(Colormax inColormax) {
-  inColormax.setStatus("gettingAlignTable");
-  String logName = "AlignTables/" + inColormax.getSerialNumber().substring(12, 16) + "_alignTable";
-  inColormax.newLog(logName);
-  inColormax.readAlignmentPoint(0);
-  int startMillis = millis();
-  while(inColormax.getStatus() != "idle"){
-    delay(1);
-    if(millis() - startMillis > 1000){
-      inColormax.setStatus("idle");
-      println("@@@@@@@@@@ getAlignTable() timeout @@@@@@@@@@");
-      return;
-    }
-  }
-}
-
-// Get Temp Table **************************************************
-void getTempTable(Colormax inColormax) {
-  inColormax.setStatus("gettingTempTable");
-  String logName = "TempTables/" + inColormax.getSerialNumber().substring(12, 16) + "_tempTable";
-  inColormax.newLog(logName);
-  inColormax.readTempPoint(0);
-  int startMillis = millis();
-  while(!inColormax.getStatus().contains("idle")){
-    delay(1);
-    if(millis() - startMillis > 1000){
-      inColormax.setStatus("idle");
-      inColormax.writeToLog("Timed out");
-      inColormax.endLog();
-      println("@@@@@@@@@@ getTempTable() timeout @@@@@@@@@@");
-      return;
-    }
-  }
-}
-
-// Get UDID **************************************************
-
-// TO DO: ADD CHECK FOR VERSION OVER 011 047
-boolean getUDID(Colormax inColormax){
-  // To get the UDID, we need to send the !D command
-  // To use the !D command, we need to use the !Z command first
-  // To use the !Z command, we need the serial number reversed in pairs of two hex digits
-  // e.g. inSN == "0123 4567 89AB CDEF", outSN == "EFCD AB89 6745 2301"
-  
-  final int commandDelay = 50;        // Delay in milliseconds required between serial commands (range: 25-infinity)
-  final int responseTimeout = 250;    // Delay for colormax response timeout (range: 25 - infinity)
-  String tempSerialNumber = inColormax.getSerialNumber();  // we may not need this
-  inColormax.setSerialNumber(null);                        //serialNumber = null so we can check for if we've got an update or not
-  inColormax.readIdentity();          // Ask for colormax's serial number - this is to make sure we have the right serial number as it's not updated if a new colormax is connected and its info not grabbed
-  
-  int startMillis = millis();         // Starting point for response timeout
-  while(inColormax.getSerialNumber() == null){
-    delay(1);                                             // Required, otherwise this function goes too fast
-    if((millis() - startMillis) > responseTimeout){       // Check if we've timed out
-      inColormax.setSerialNumber(tempSerialNumber);       // If not, set this back, I guess?
-      println("@@@@@@@@@@", inColormax.serial.port.getPortName(),", getUDID serial number response timeout @@@@@@@@@@");  // Print out an error
-      return false;                                             // Leave this function!
-    }
-  }
-  
-  // Now that we know for sure we have the right serial number
-  char[] sn = inColormax.getSerialNumber().toCharArray();  // Make it an array; easier to maniuplate indiviudal characters like this
-  char[] sn2 = new char[16];                               // Make a second array to store the deletion code (this will be used to make a string later)
-  
-  int i;                            // For iterating through sn
-  int j = 0;                        // For iterating through sn2
-  for(i = (sn.length - 1) ; i > 0 ; i -= 2){     // Start from the end of sn[], make sure we stay above 0, decrement by 2
-    sn2[j++] = sn[i-1];             // Increment through sn2[], go half-backwards through sn[] (it's weird, i know)
-    sn2[j++] = sn[i];
-  }
-  
-  // We can finally send the !Z and !D commands
-  String serialNumberDeletionCode = new String(sn2);              // The !Z command actually deletes the unit's serial number; we need it as a string for our function
-  inColormax.writeDeleteSerialNumber(serialNumberDeletionCode);   // Tell the unit to delete its serial number; no worries, we have its serial number stored in the object for later
-  delay(commandDelay);                                            // Wait a little while for the unit to do its thing
-  inColormax.readUDID();                                          // Send the !D command
-  delay(commandDelay);                                            // Wait a little while for the unit to do its thing
-  inColormax.writeSerialNumber(inColormax.getSerialNumber());     // Send the !I command to have the unit rewrite its serial number!
-  //println(inColormax.getUDID());
-  return true;// All done
-}
-
-// Delete Serial Number
-boolean deleteSerialNumber(Colormax inColormax){
-  // To get the UDID, we need to send the !D command
-  // To use the !D command, we need to use the !Z command first
-  // To use the !Z command, we need the serial number reversed in pairs of two hex digits
-  // e.g. inSN == "0123 4567 89AB CDEF", outSN == "EFCD AB89 6745 2301"
-  
-  final int commandDelay = 50;        // Delay in milliseconds required between serial commands (range: 25-infinity)
-  final int responseTimeout = 250;    // Delay for colormax response timeout (range: 25 - infinity)
-  String tempSerialNumber = inColormax.getSerialNumber();  // we may not need this
-  inColormax.setSerialNumber(null);                        //serialNumber = null so we can check for if we've got an update or not
-  inColormax.readIdentity();          // Ask for colormax's serial number - this is to make sure we have the right serial number as it's not updated if a new colormax is connected and its info not grabbed
-  
-  int startMillis = millis();         // Starting point for response timeout
-  while(inColormax.getSerialNumber() == null){
-    delay(1);                                             // Required, otherwise this function goes too fast
-    if((millis() - startMillis) > responseTimeout){       // Check if we've timed out
-      inColormax.setSerialNumber(tempSerialNumber);       // If not, set this back, I guess?
-      println("@@@@@@@@@@", inColormax.serial.port.getPortName(),", getUDID serial number response timeout @@@@@@@@@@");  // Print out an error
-      return false;                                             // Leave this function!
-    }
-  }
-  
-  // Now that we know for sure we have the right serial number
-  char[] sn = inColormax.getSerialNumber().toCharArray();  // Make it an array; easier to maniuplate indiviudal characters like this
-  char[] sn2 = new char[16];                               // Make a second array to store the deletion code (this will be used to make a string later)
-  
-  int i;                            // For iterating through sn
-  int j = 0;                        // For iterating through sn2
-  for(i = (sn.length - 1) ; i > 0 ; i -= 2){     // Start from the end of sn[], make sure we stay above 0, decrement by 2
-    sn2[j++] = sn[i-1];             // Increment through sn2[], go half-backwards through sn[] (it's weird, i know)
-    sn2[j++] = sn[i];
-  }
-  
-  // We can finally send the !Z and !D commands
-  String serialNumberDeletionCode = new String(sn2);              // The !Z command actually deletes the unit's serial number; we need it as a string for our function
-  inColormax.writeDeleteSerialNumber(serialNumberDeletionCode);   // Tell the unit to delete its serial number; no worries, we have its serial number stored in the object for later
-  return true;
-}
-
-// Calculate UDIDcd **************************************************
-String calcUDIDcd(Colormax inColormax){
-  // The UDIDcd is a strange beast..
-  // We need to M xor N where:
-  // M = hex values 18, 24, 4, 30, 23, and 12 from the UDID
-  // N = The last 7 digits of the unit's serial number in reverse order, converted to a hex value
-  
-  
-  // TO DO: ADD CHECK FOR COLORMAX ALREADY HAVING UDID STORED
-  if(inColormax.getUDID() != null || !getUDID(inColormax)){  // Make sure we have the unit's UDID
-    return "error";  // We couldn't get the UDID, leave now
-  }
-  else {     // We got it! Moving on...
-    // Let's get M first
-    char[] inUDID = inColormax.getUDID().toCharArray();        // Convert the UDID to an array of characters, because it's easier to deal with
-    char[] tempM = { inUDID[17], inUDID[23], inUDID[3], inUDID[29], inUDID[22], inUDID[11]  };  // M = hex values 18, 24, 4, 30, 23, and 12 from the UDID
-    String M = new String(tempM);                              // Turn that badboi into a string
-    //println("M:", M);  // for debugging
-    
-    // Now lets get N
-    char[] inSN = inColormax.getSerialNumber().toCharArray();  // Convert the serial number to an array
-    char[] tempN = new char[7];                                // Second array to temporarily hold N
-    
-    // We need the last 7 digits of inSN in reverse order
-    int i = 0;                              // Just need one iterating variable
-    for(i = 0 ; i < tempN.length ; i++){    // Start from the beginning, make sure we don't exceed our array length, increment once
-      tempN[i] = inSN[inSN.length - (i + 1)];     // Go in reverse, bb
-    }
-    String N = new String(tempN);           // Chuck that into a string
-    N = String.format("%X", Integer.parseInt(N));    // Do some fancy footwork to make that string a hex value
-    //println("N:", N);  // for debugging
-    
-    // Now we just xor those bois together
-    String UDIDcd = String.format("%X", ((Integer.parseInt(M, 16)) ^ (Integer.parseInt(N, 16))));
-    inColormax.setUDIDcd(UDIDcd);
-    //println("UDIDcd:", UDIDcd);  //for debugging
-    return UDIDcd;
-  }
-}
-
-// Transfer Memory
-void transferMemory(Colormax inColormax){
-  
-}
 
 // Key Pressed Event Listener **************************************************
 void keyPressed() {
@@ -656,6 +492,16 @@ void serialEvent(Serial inPort) {
 
   if (inString.startsWith("!d")) {
     colormaxes[listColormaxSelect.getSelectedIndex()].parseData(inString);
+    if(gettingAvg && avgReadingsIndex < redChannel.length){                                // Check if we're getting averaged readings and that we're not out of range
+      redChannel[avgReadingsIndex] = Integer.parseInt(inString.substring(3, 7), 16);       // Set red channel readings
+      greenChannel[avgReadingsIndex] = Integer.parseInt(inString.substring(8, 12), 16);    // Set green channel readings
+      blueChannel[avgReadingsIndex] = Integer.parseInt(inString.substring(13, 17), 16);    // Set blue channel readings
+      
+      avgReadingsIndex++;
+      if(avgReadingsIndex >= redChannel.length){     // Check if we've reached the end of the arrays
+        avgReadingsIndex = -1;                       // If so, set avgReadingsIndex to -1 so other methods know we're done
+      }
+    }
     return;
   }
   
