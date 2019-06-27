@@ -14,7 +14,6 @@
 // TO DO:
 // add to oneSecondTimerListener; check if we've hit an interval
 // // if we have, add to our open log and create a standalone log
-// add functionality to start button
 // add functionality to end button
 // // make sure we close that open log
 // add a timer label to show how many seconds have passed (cuz i'm lazy)
@@ -28,15 +27,13 @@ import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 import javax.swing.Timer;
 import java.text.DecimalFormat;
-import java.math.RoundingMode;
-import java.math.*;
 
 // Intervals for taking data in seconds
 // This, ideally would be edited via some fort of GUI,
 // But this program should aslo be ~1 time use, so I'm not worried about it
 // Putting it at the top of the application code will have to do
 final int[] colormaxIntervals = {
-0,
+//0,
 60,                // 1 minute
 120,               // 2 minutes
 180,               // 3 minutes
@@ -99,7 +96,7 @@ Colormax colormaxes[] = new Colormax[100];
 // Setup
 //****************************************************************************************************
 public void setup() {
-  size(500, 570, JAVA2D);
+  size(500, 510, JAVA2D);
   createGUI();
   customGUI();
 
@@ -313,6 +310,18 @@ void startTimeTest(final Colormax inColormax){
   timeTestIndex = 0;                               // Make sure we reset timeTestIndex
   timeTestColormax = inColormax;                   // Set which colormax we're testing
   inColormax.setStatus(inColormax.timeTesting);    // Set status so other functions know what's going on
+  //inWriter.print(hour());
+  //inWriter.print(':');
+  //inWriter.print(String.format("%02d", minute()));
+  //inWriter.print(' ');
+  //inWriter.print(month());
+  //inWriter.print('/');
+  //inWriter.print(day());
+  //inWriter.print('/');
+  //inWriter.print(year());
+  //inWriter.println();
+  String startTime = hour() + ":" + String.format("%02d", minute()) + " on " + month() + "/" + day() + "/" + year();
+  lblTestStarted.setText(startTime);
   oneSecondTimer.start();                          // Let that timer rip
 }
 
@@ -377,7 +386,7 @@ void getAveragedReadings(Colormax inColormax){
   averagedReadings[0] = Float.valueOf(df.format((float)redAvg / 0xffc0 * 100));
   averagedReadings[1] = Float.valueOf(df.format((float)greenAvg / 0xffc0 * 100));
   averagedReadings[2] = Float.valueOf(df.format((float)blueAvg / 0xffc0 * 100));
-  //println(averagedReadings);
+  println(averagedReadings);
   //averagedReadings[0] = (float)redAvg / 0xffc0 * 100;
   //averagedReadings[1] = (float)greenAvg / 0xffc0 * 100;
   //averagedReadings[2] = (float)blueAvg / 0xffc0 * 100;
@@ -387,9 +396,9 @@ void getAveragedReadings(Colormax inColormax){
 volatile int counter = 0;
 ActionListener oneSecondTimerListener = new ActionListener() {
   public void actionPerformed(ActionEvent e) {
-    //println("yeet");
     final int max = 60;
     counter++;
+    lblSecondsPassed.setText(String.valueOf(counter));
 
     // quick fix to make this code work from where it used to be
     Colormax inColormax = colormaxes[listColormaxSelect.getSelectedIndex()];
@@ -402,7 +411,20 @@ ActionListener oneSecondTimerListener = new ActionListener() {
       if(counter >= colormaxIntervals[timeTestIndex]){    // Check if we've passed our next intervals (see colormaxIntervals[])
         timeTestIndex++;                                  // If we have, up the index
         getAveragedReadings(inColormax);                  // Get averaged readings
-        println(averagedReadings);
+        
+        String prefix = "Time Data/" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";
+        String randomVal = String.valueOf((int)random(9999));
+        String fileName = prefix + randomVal + ".txt";
+        PrintWriter writer = createWriter(fileName);
+        utilPrintColormaxInfo(writer, inColormax);
+        utilPrintTimestamp(writer);
+        for(int i = 0 ; i < averagedReadings.length ; i++){
+          writer.print(averagedReadings[i]);
+          writer.print("\t");
+        }
+        writer.print(";");
+        utilFlushAndClose(writer);
+        // println(averagedReadings);
         // TO DO:
         // Print out to writers
           // one volatile, global one,
