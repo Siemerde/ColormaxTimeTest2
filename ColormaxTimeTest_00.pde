@@ -90,6 +90,9 @@ boolean populatingColormaxes = false;
 Timer oneSecondTimer;
 Timer updateTimer;
 
+// PrintWriter
+PrintWriter timeTestWriter;
+
 Colormax colormaxes[] = new Colormax[100];
 
 //****************************************************************************************************
@@ -310,19 +313,32 @@ void startTimeTest(final Colormax inColormax){
   timeTestIndex = 0;                               // Make sure we reset timeTestIndex
   timeTestColormax = inColormax;                   // Set which colormax we're testing
   inColormax.setStatus(inColormax.timeTesting);    // Set status so other functions know what's going on
-  //inWriter.print(hour());
-  //inWriter.print(':');
-  //inWriter.print(String.format("%02d", minute()));
-  //inWriter.print(' ');
-  //inWriter.print(month());
-  //inWriter.print('/');
-  //inWriter.print(day());
-  //inWriter.print('/');
-  //inWriter.print(year());
-  //inWriter.println();
+  
+  // Make filename and create new txt file/initialize printwriter for longterm data collection
+  String prefix = "Time Test Full Logs/" + inColormax.getSerialNumber().substring(12, 16) + "_" + "full log" + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+  String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
+  String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
+  timeTestWriter = createWriter(fileName);               // Make snippet writer/file
+  utilPrintColormaxInfo(timeTestWriter, inColormax);     // Print info about colormax at top of our txt file
+  utilPrintTimestamp(timeTestWriter);                    // Print timestamp in our txt file
+  
   String startTime = hour() + ":" + String.format("%02d", minute()) + " on " + month() + "/" + day() + "/" + year();
   lblTestStarted.setText(startTime);
   oneSecondTimer.start();                          // Let that timer rip
+}
+
+// Stop Time Test **************************************************
+void stopTimeTest(final Colormax inColormax){
+  if(inColormax.getStatus() == inColormax.timeTesting){
+    oneSecondTimer.stop();                        // Stop one second swing timer
+    inColormax.setStatus(inColormax.idle);        // Reset colormax's status
+    timeTestWriter.print("Total Test Time:");     // Print prefix for total test time (in seconds)
+    timeTestWriter.println(counter);              // Print out total length, in seconds, of our test
+    timeTestWriter.print("Time Test Ended: ");    // Print prefix for finish time/date
+    utilPrintTimestamp(timeTestWriter);           // Print ending time stamp
+    utilFlushAndClose(timeTestWriter);            // Close out the log
+    println("test ended");
+  }
 }
 
 //  **************************************************
@@ -412,30 +428,32 @@ ActionListener oneSecondTimerListener = new ActionListener() {
         timeTestIndex++;                                  // If we have, up the index
         getAveragedReadings(inColormax);                  // Get averaged readings
         
-        String prefix = "Time Data/" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";
-        String randomVal = String.valueOf((int)random(9999));
-        String fileName = prefix + randomVal + ".txt";
-        PrintWriter writer = createWriter(fileName);
-        utilPrintColormaxInfo(writer, inColormax);
-        utilPrintTimestamp(writer);
+        String prefix = "Time Test Snippet Logs/" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+        String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
+        String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
+        PrintWriter writer = createWriter(fileName);           // Make snippet writer/file
+        utilPrintColormaxInfo(writer, inColormax);             // Print info about colormax at top of our txt file
+        utilPrintTimestamp(writer);                            // Print timestamp in our txt file
+        
         for(int i = 0 ; i < averagedReadings.length ; i++){
+          timeTestWriter.print(averagedReadings[i]);
+          timeTestWriter.print("\t");
           writer.print(averagedReadings[i]);
           writer.print("\t");
         }
+        timeTestWriter.println(";");
         writer.print(";");
         utilFlushAndClose(writer);
-        // println(averagedReadings);
-        // TO DO:
-        // Print out to writers
-          // one volatile, global one,
-          // one that we make and close here
+        if(timeTestIndex > colormaxIntervals.length){
+          stopTimeTest(inColormax);
+        }
       }
     }
     
     else if (inColormax.getStatus() == inColormax.calibrating && counter >= max) {
       counter = 0;            // Reset counter
       oneSecondTimer.stop();  // End timer
-      println("it is time");  //for debugging
+      //println("it is time");  //for debugging
 
       // Calibrating color
       if(inColormax.getStatus() == inColormax.calibrating) {

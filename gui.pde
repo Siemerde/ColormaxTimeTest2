@@ -66,7 +66,8 @@ public void btnStart_click1(GButton source, GEvent event) { //_CODE_:btnStart:98
 } //_CODE_:btnStart:983112:
 
 public void btnStop_click1(GButton source, GEvent event) { //_CODE_:btnStop:894027:
-  println("btnStop - GButton >> GEvent." + event + " @ " + millis());
+  stopTimeTest(colormaxes[listColormaxSelect.getSelectedIndex()]);
+  //println("btnStop - GButton >> GEvent." + event + " @ " + millis());
 } //_CODE_:btnStop:894027:
 
 
