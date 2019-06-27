@@ -63,7 +63,8 @@ public void txtRedGreenBlue_change1(GTextField source, GEvent event) { //_CODE_:
 } //_CODE_:txtRedGreenBlue:961884:
 
 public void btnStart_click1(GButton source, GEvent event) { //_CODE_:btnStart:983112:
-  println("button1 - GButton >> GEvent." + event + " @ " + millis());
+  startTimeTest(colormaxes[listColormaxSelect.getSelectedIndex()]);
+  //println("button1 - GButton >> GEvent." + event + " @ " + millis());
 } //_CODE_:btnStart:983112:
 
 public void btnStop_click1(GButton source, GEvent event) { //_CODE_:btnStop:894027:
