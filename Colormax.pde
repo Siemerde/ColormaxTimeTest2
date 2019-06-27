@@ -1133,29 +1133,6 @@ class Colormax
     serial.write(13);
   }
   
-  //void writeStartGetAlign() {
-  //  println("Getting align for ", label);
-  //  isBusy |= 0x40;
-  //  alignIndex = 0;
-  //  String logName = "S" + serialNumber.substring(12, 16) + "_alignTable";
-  //  newLog(logName);
-  //  //writeAlignmentOff();
-  //  //delay(commandDelay);
-  //  writeAlignPoint(alignIndex);
-  //}
-  
-  //void continueGetAlign() {
-  //  isBusy |= 0x40;
-  //  writeAlignPoint(++alignIndex);
-  //  println("Getting align point ", currentAlignPoint, " for ", label);
-  //}
-  
-  //void stopGetAlign() {
-  //  println("Done getting align table for ", label);
-  //  isBusy &= ~0x40;
-  //  //writeAlignmentOn();
-  //}
-  
   void writeRetakeRead(int pointNumber){
     // Convert pointNumber to two digit, hex version of itself
     // and append to !O,9 command
