@@ -33,7 +33,7 @@ import java.text.DecimalFormat;
 // But this program should aslo be ~1 time use, so I'm not worried about it
 // Putting it at the top of the application code will have to do
 final int[] colormaxIntervals = {
-//0,
+5,
 60,                // 1 minute
 120,               // 2 minutes
 180,               // 3 minutes
@@ -94,6 +94,8 @@ Timer updateTimer;
 PrintWriter timeTestWriter;
 
 Colormax colormaxes[] = new Colormax[100];
+
+final String readingsHeading = "Time(sec)\tRed\tGreen\tBlue\tTemperature";
 
 //****************************************************************************************************
 // Setup
@@ -268,12 +270,13 @@ void updateColormaxInfo(Colormax inColormax) {
    // And I'm too dumb to figure out how to make an array of methods to call with a for(){} loop
    // No need for so many lines of code, so I've put the delay in-line with each method call
    // like so: inColormax.readCLT();delay(commandDelay);
+   inColormax.readIdentity();delay(commandDelay);
+   inColormax.readVersion();delay(commandDelay);
    inColormax.readData();delay(commandDelay);
    inColormax.readTemperature();delay(commandDelay);
    inColormax.readIlluminationAlgorithm();delay(commandDelay);
    inColormax.readSettings();delay(commandDelay);
-   inColormax.readIdentity();delay(commandDelay);
-   inColormax.readVersion();delay(commandDelay);
+
    inColormax.readIlluminationFactor();delay(commandDelay);
 
    lblRedPercentData.setText(String.format("%.1f", inColormax.getRedPercent() - 0.05) + "%");
@@ -315,15 +318,17 @@ void startTimeTest(final Colormax inColormax){
   inColormax.setStatus(inColormax.timeTesting);    // Set status so other functions know what's going on
   
   // Make filename and create new txt file/initialize printwriter for longterm data collection
-  String prefix = "Time Test Full Logs/" + inColormax.getSerialNumber().substring(12, 16) + "_" + "full log" + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+  String prefix = "Time Test Full Logs/Unit" + inColormax.getSerialNumber().substring(12, 16) + "_" + "full log" + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
   String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
   String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
   timeTestWriter = createWriter(fileName);               // Make snippet writer/file
   utilPrintColormaxInfo(timeTestWriter, inColormax);     // Print info about colormax at top of our txt file
   utilPrintTimestamp(timeTestWriter);                    // Print timestamp in our txt file
+  timeTestWriter.println(readingsHeading);
   
   String startTime = hour() + ":" + String.format("%02d", minute()) + " on " + month() + "/" + day() + "/" + year();
   lblTestStarted.setText(startTime);
+  lblSecondsPassed.setText("0");
   oneSecondTimer.start();                          // Let that timer rip
 }
 
@@ -332,9 +337,9 @@ void stopTimeTest(final Colormax inColormax){
   if(inColormax.getStatus() == inColormax.timeTesting){
     oneSecondTimer.stop();                        // Stop one second swing timer
     inColormax.setStatus(inColormax.idle);        // Reset colormax's status
-    timeTestWriter.print("Total Test Time:");     // Print prefix for total test time (in seconds)
+    timeTestWriter.print("Total Test Time:\t");     // Print prefix for total test time (in seconds)
     timeTestWriter.println(counter);              // Print out total length, in seconds, of our test
-    timeTestWriter.print("Time Test Ended: ");    // Print prefix for finish time/date
+    timeTestWriter.print("Time Test Ended:\t");    // Print prefix for finish time/date
     utilPrintTimestamp(timeTestWriter);           // Print ending time stamp
     utilFlushAndClose(timeTestWriter);            // Close out the log
     println("test ended");
@@ -351,7 +356,8 @@ volatile int blueChannel[] = new int[sampleSize];     // For storing blue channe
 // 0 = red channel readings
 // 1 = green channel readings
 // 2 = blue channel readings
-volatile float averagedReadings[] = new float[3];
+// 3 = temperature
+volatile float averagedReadings[] = new float[4];
 
 volatile int avgReadingsIndex;  // For keeping track of how many readings we have in the averaging arrays (we could technically do this by checking for zeroes or nulls or something, but w/e)
 volatile boolean gettingAvg = false;
@@ -381,31 +387,31 @@ void getAveragedReadings(Colormax inColormax){
     }
   }
   
-  int redAvg = 0;
-  int greenAvg = 0;
-  int blueAvg = 0;
+  inColormax.readTemperature();  // Make sure we have the latest temperature reading
+  
+  int redAvg = 0;    // For storing averaged red readings
+  int greenAvg = 0;  // For storing averaged green readings
+  int blueAvg = 0;   // For storing averaged blue readings
   for(int i = 0 ; i < redChannel.length ; i++){
-     redAvg += redChannel[i];
+     redAvg += redChannel[i];        // Add up all the readings
   }
   for(int i = 0 ; i < greenChannel.length ; i++){
-     greenAvg += greenChannel[i];
+     greenAvg += greenChannel[i];    // Add up all the readings
   }
   for(int i = 0 ; i < blueChannel.length ; i++){
-     blueAvg += blueChannel[i];
+     blueAvg += blueChannel[i];     // Add up all the readings
   }
-  redAvg /= redChannel.length;
-  greenAvg /= greenChannel.length;
-  blueAvg /= blueChannel.length;
+  redAvg /= redChannel.length;      // Divide by the number of readings
+  greenAvg /= greenChannel.length;  // Divide by the number of readings
+  blueAvg /= blueChannel.length;    // Divide by the number of readings
   
-  DecimalFormat df = new DecimalFormat("###.00");
+  DecimalFormat df = new DecimalFormat("###.00");  // Used to round to two decimal points
   
-  averagedReadings[0] = Float.valueOf(df.format((float)redAvg / 0xffc0 * 100));
-  averagedReadings[1] = Float.valueOf(df.format((float)greenAvg / 0xffc0 * 100));
-  averagedReadings[2] = Float.valueOf(df.format((float)blueAvg / 0xffc0 * 100));
+  averagedReadings[0] = Float.valueOf(df.format((float)redAvg / 0xffc0 * 100));    // Convert from decimal output to percentage readings (0xFFC0 is the max value)
+  averagedReadings[1] = Float.valueOf(df.format((float)greenAvg / 0xffc0 * 100));  // Convert from decimal output to percentage readings (0xFFC0 is the max value)
+  averagedReadings[2] = Float.valueOf(df.format((float)blueAvg / 0xffc0 * 100));   // Convert from decimal output to percentage readings (0xFFC0 is the max value)
+  averagedReadings[3] = inColormax.temperature;                                    // Tag the temperature at the end
   println(averagedReadings);
-  //averagedReadings[0] = (float)redAvg / 0xffc0 * 100;
-  //averagedReadings[1] = (float)greenAvg / 0xffc0 * 100;
-  //averagedReadings[2] = (float)blueAvg / 0xffc0 * 100;
 }
 
 // Timer Listeners **************************************************
@@ -428,24 +434,31 @@ ActionListener oneSecondTimerListener = new ActionListener() {
         timeTestIndex++;                                  // If we have, up the index
         getAveragedReadings(inColormax);                  // Get averaged readings
         
-        String prefix = "Time Test Snippet Logs/" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+        String prefix = "Time Test Snippet Logs/Unit" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
         String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
         String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
         PrintWriter writer = createWriter(fileName);           // Make snippet writer/file
+        
         utilPrintColormaxInfo(writer, inColormax);             // Print info about colormax at top of our txt file
         utilPrintTimestamp(writer);                            // Print timestamp in our txt file
         
+        timeTestWriter.print(colormaxIntervals[timeTestIndex]);        // Print out time (in seconds) to full log
+        timeTestWriter.print("\t");                                    // Print out a tab over to full log
+        writer.println(readingsHeading); // Print out data header to snippet log
+        writer.print(colormaxIntervals[timeTestIndex]);                // Print out time (in seconds) to snippet log
+        writer.print("\t");                                            // Print out a tab over to snippet log
+        
         for(int i = 0 ; i < averagedReadings.length ; i++){
-          timeTestWriter.print(averagedReadings[i]);
-          timeTestWriter.print("\t");
-          writer.print(averagedReadings[i]);
-          writer.print("\t");
+          timeTestWriter.print(averagedReadings[i]);    // Print averaged readings and temperature to full log
+          timeTestWriter.print("\t");                   // Print a tab over between data points
+          writer.print(averagedReadings[i]);            // Print averaged readings and temperature to full log
+          writer.print("\t");                           // Print a tab over between data points
         }
-        timeTestWriter.println(";");
-        writer.print(";");
+        //timeTestWriter.println(";");                    // Print a delimiter
+        //writer.print(";");                              // Print a delimiter
         utilFlushAndClose(writer);
-        if(timeTestIndex > colormaxIntervals.length){
-          stopTimeTest(inColormax);
+        if(timeTestIndex > colormaxIntervals.length){   // Check if we hit the max interval
+          stopTimeTest(inColormax);                     // If we have, close out the full log
         }
       }
     }

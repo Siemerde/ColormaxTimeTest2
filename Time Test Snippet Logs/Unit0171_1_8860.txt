@@ -1,0 +1,6 @@
+COM port: COM10
+colormax settings: !s,8,0,0,0,64
+colormax version: 00B 023
+colormax serial#: 0127192200030171
+11:53 6/28/2019
+48.3	51.18	53.91	35.8125	;

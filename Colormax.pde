@@ -1232,8 +1232,14 @@ class Colormax
   }
 
   void parseTemperature(String inTemperature){
-    short tempTemp = (short) Integer.parseInt(inTemperature.substring(3,7), 16);  // Convert raw input into a 16-bit signed integer
-    temperature = (float) tempTemp / 16;                                          // Convert to floating point ºC
+    int subversion = Integer.parseInt(firmwareVersion.substring(4,7), 16);
+    if(subversion <= 35){
+      temperature = Float.valueOf(inTemperature.substring(3,12));
+    }
+    else if(subversion > 35 ){
+      short tempTemp = (short) Integer.parseInt(inTemperature.substring(3,7), 16);  // Convert raw input into a 16-bit signed integer
+      temperature = (float) tempTemp / 16;                                          // Convert to floating point ºC
+    }
   }
   
   void transferMemory(String inUDIDcd){
