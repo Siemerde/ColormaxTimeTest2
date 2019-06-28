@@ -33,7 +33,12 @@ import java.text.DecimalFormat;
 // But this program should aslo be ~1 time use, so I'm not worried about it
 // Putting it at the top of the application code will have to do
 final int[] colormaxIntervals = {
-5,
+0,                 // 1 second
+10,                // 10 seconds
+20,                // 20 seconds
+30,                // 30 seconds
+40,                // 40 seconds
+50,                // 50 seconds
 60,                // 1 minute
 120,               // 2 minutes
 180,               // 3 minutes
@@ -95,7 +100,7 @@ PrintWriter timeTestWriter;
 
 Colormax colormaxes[] = new Colormax[100];
 
-final String readingsHeading = "Time(sec)\tRed\tGreen\tBlue\tTemperature";
+final String readingsHeading = "Time(sec)\tRed\tGreen\tBlue\tTemperature(ºC)";
 
 //****************************************************************************************************
 // Setup
@@ -317,10 +322,13 @@ void startTimeTest(final Colormax inColormax){
   timeTestColormax = inColormax;                   // Set which colormax we're testing
   inColormax.setStatus(inColormax.timeTesting);    // Set status so other functions know what's going on
   
+  inColormax.writeAlignmentOff();delay(50);
+  inColormax.writeTempOff();delay(50);
+  
   // Make filename and create new txt file/initialize printwriter for longterm data collection
-  String prefix = "Time Test Full Logs/Unit" + inColormax.getSerialNumber().substring(12, 16) + "_" + "full log" + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+  String prefix = "Time Test Full Logs/Unit_" + inColormax.getSerialNumber().substring(12, 16) + "_" + "full log" + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
   String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
-  String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
+  String fileName = prefix + "(" + randomVal + ")" + ".txt";         // Put it all together w/ .txt suffix
   timeTestWriter = createWriter(fileName);               // Make snippet writer/file
   utilPrintColormaxInfo(timeTestWriter, inColormax);     // Print info about colormax at top of our txt file
   utilPrintTimestamp(timeTestWriter);                    // Print timestamp in our txt file
@@ -377,6 +385,8 @@ void getAveragedReadings(Colormax inColormax){
     inColormax.readData();                  // Ask colormax for RGB readings
     delay(commandDelay);                    // Required delay; Colormax needs time to respond and recoup
   }
+  inColormax.readTemperature();  // Make sure we have the latest temperature reading
+  delay(100);
   
   int startMillis = millis();               //  Setup for timeout
   while(avgReadingsIndex != -1){            // Check if we're done getting avgReadings
@@ -386,8 +396,6 @@ void getAveragedReadings(Colormax inColormax){
       break;
     }
   }
-  
-  inColormax.readTemperature();  // Make sure we have the latest temperature reading
   
   int redAvg = 0;    // For storing averaged red readings
   int greenAvg = 0;  // For storing averaged green readings
@@ -431,12 +439,12 @@ ActionListener oneSecondTimerListener = new ActionListener() {
     
     else if(inColormax.getStatus() == inColormax.timeTesting){
       if(counter >= colormaxIntervals[timeTestIndex]){    // Check if we've passed our next intervals (see colormaxIntervals[])
-        timeTestIndex++;                                  // If we have, up the index
+        
         getAveragedReadings(inColormax);                  // Get averaged readings
         
-        String prefix = "Time Test Snippet Logs/Unit" + inColormax.getSerialNumber().substring(12, 16) + "_" + counter + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
+        String prefix = "Time Test Snippet Logs/Unit_" + inColormax.getSerialNumber().substring(12, 16) + "_" + colormaxIntervals[timeTestIndex] + "_";    // Start of file name for snippet log (Time Test Snippet Logs/ is the folder this will be in)
         String randomVal = String.valueOf((int)random(9999));  // Random number at the end of the name to avoid duplicate names
-        String fileName = prefix + randomVal + ".txt";         // Put it all together w/ .txt suffix
+        String fileName = prefix + "(" + randomVal + ")" + ".txt";         // Put it all together w/ .txt suffix
         PrintWriter writer = createWriter(fileName);           // Make snippet writer/file
         
         utilPrintColormaxInfo(writer, inColormax);             // Print info about colormax at top of our txt file
@@ -454,9 +462,10 @@ ActionListener oneSecondTimerListener = new ActionListener() {
           writer.print(averagedReadings[i]);            // Print averaged readings and temperature to full log
           writer.print("\t");                           // Print a tab over between data points
         }
-        //timeTestWriter.println(";");                    // Print a delimiter
-        //writer.print(";");                              // Print a delimiter
+        timeTestWriter.println();
         utilFlushAndClose(writer);
+        
+        timeTestIndex++;                                // Up the index
         if(timeTestIndex > colormaxIntervals.length){   // Check if we hit the max interval
           stopTimeTest(inColormax);                     // If we have, close out the full log
         }
