@@ -1,0 +1,7 @@
+COM port: COM4
+colormax settings: !s,8,0,0,0,64
+colormax version: 00B 023
+colormax serial#: 0127192200030151
+11:12 7/1/2019
+Time(sec)	Red	Green	Blue	Temperature(ºC)
+600	50.77	50.84	56.23	34.5	

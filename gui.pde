@@ -70,6 +70,14 @@ public void btnStop_click1(GButton source, GEvent event) { //_CODE_:btnStop:8940
   //println("btnStop - GButton >> GEvent." + event + " @ " + millis());
 } //_CODE_:btnStop:894027:
 
+public void optnIntervals_clicked1(GOption source, GEvent event) { //_CODE_:optnIntervals:803922:
+  println("optnIntervals - GOption >> GEvent." + event + " @ " + millis());
+} //_CODE_:optnIntervals:803922:
+
+public void optnHourly_clicked1(GOption source, GEvent event) { //_CODE_:optnHourly:565905:
+  println("option2 - GOption >> GEvent." + event + " @ " + millis());
+} //_CODE_:optnHourly:565905:
+
 
 
 // Create all the GUI controls. 
@@ -282,6 +290,20 @@ public void createGUI(){
   lblSecondsPassed = new GLabel(this, 180, 480, 310, 20);
   lblSecondsPassed.setText("N/A");
   lblSecondsPassed.setOpaque(false);
+  optnsIntervalOptions = new GToggleGroup();
+  optnIntervals = new GOption(this, 210, 330, 120, 20);
+  optnIntervals.setIconAlign(GAlign.LEFT, GAlign.MIDDLE);
+  optnIntervals.setText("Intervals");
+  optnIntervals.setOpaque(false);
+  optnIntervals.addEventHandler(this, "optnIntervals_clicked1");
+  optnHourly = new GOption(this, 330, 330, 120, 20);
+  optnHourly.setIconAlign(GAlign.LEFT, GAlign.MIDDLE);
+  optnHourly.setText("Hourly");
+  optnHourly.setOpaque(false);
+  optnHourly.addEventHandler(this, "optnHourly_clicked1");
+  optnsIntervalOptions.addControl(optnIntervals);
+  optnIntervals.setSelected(true);
+  optnsIntervalOptions.addControl(optnHourly);
 }
 
 // Variable declarations 
@@ -337,3 +359,6 @@ GLabel lblTestStartedLabel;
 GLabel lblSecondsPassedLabel; 
 GLabel lblTestStarted; 
 GLabel lblSecondsPassed; 
+GToggleGroup optnsIntervalOptions; 
+GOption optnIntervals; 
+GOption optnHourly; 
